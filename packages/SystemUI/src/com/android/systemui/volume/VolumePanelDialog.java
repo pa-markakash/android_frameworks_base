@@ -53,6 +53,7 @@ import com.android.settingslib.bluetooth.LocalBluetoothProfileManager;
 import com.android.settingslib.media.MediaOutputConstants;
 import com.android.systemui.R;
 import com.android.systemui.plugins.ActivityStarter;
+import com.android.systemui.plugins.VolumeDialogController;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
 
 import java.util.ArrayList;
@@ -68,7 +69,7 @@ public class VolumePanelDialog extends SystemUIDialog implements LifecycleOwner 
     private static final String TAG = "VolumePanelDialog";
 
     private static final int DURATION_SLICE_BINDING_TIMEOUT_MS = 200;
-    private static final int DEFAULT_SLICE_SIZE = 4;
+    private static final int DEFAULT_SLICE_SIZE = 5;
 
     private final ActivityStarter mActivityStarter;
     private RecyclerView mVolumePanelSlices;
@@ -79,12 +80,15 @@ public class VolumePanelDialog extends SystemUIDialog implements LifecycleOwner 
     private final HashSet<Uri> mLoadedSlices = new HashSet<>();
     private boolean mSlicesReadyToLoad;
     private LocalBluetoothProfileManager mProfileManager;
+    private final VolumeDialogController mController;
 
     public VolumePanelDialog(Context context,
-            ActivityStarter activityStarter, boolean aboveStatusBar) {
+            ActivityStarter activityStarter, boolean aboveStatusBar,
+            VolumeDialogController controller) {
         super(context);
         mActivityStarter = activityStarter;
         mLifecycleRegistry = new LifecycleRegistry(this);
+        mController = controller;
         if (!aboveStatusBar) {
             getWindow().setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
         }
@@ -119,8 +123,6 @@ public class VolumePanelDialog extends SystemUIDialog implements LifecycleOwner 
 
         mVolumePanelSlices = dialogView.findViewById(R.id.volume_panel_parent_layout);
         mVolumePanelSlices.setLayoutManager(new LinearLayoutManager(getContext()));
-
-        loadAllSlices();
 
         mLifecycleRegistry.setCurrentState(Lifecycle.State.CREATED);
     }
@@ -198,6 +200,8 @@ public class VolumePanelDialog extends SystemUIDialog implements LifecycleOwner 
     @Override
     protected void start() {
         Log.d(TAG, "onStart");
+        loadAllSlices();
+        mController.notifyVisible(true);
         mLifecycleRegistry.setCurrentState(Lifecycle.State.STARTED);
         mLifecycleRegistry.setCurrentState(Lifecycle.State.RESUMED);
     }
@@ -205,6 +209,7 @@ public class VolumePanelDialog extends SystemUIDialog implements LifecycleOwner 
     @Override
     protected void stop() {
         Log.d(TAG, "onStop");
+        mController.notifyVisible(false);
         mLifecycleRegistry.setCurrentState(Lifecycle.State.DESTROYED);
     }
 
@@ -220,6 +225,8 @@ public class VolumePanelDialog extends SystemUIDialog implements LifecycleOwner 
         uris.add(MEDIA_OUTPUT_INDICATOR_SLICE_URI);
         uris.add(VOLUME_CALL_URI);
         uris.add(VOLUME_RINGER_URI);
+        uris.add(VOLUME_SEPARATE_RING_URI);
+        uris.add(VOLUME_NOTIFICATION_URI);
         uris.add(VOLUME_ALARM_URI);
         return uris;
     }
@@ -254,6 +261,18 @@ public class VolumePanelDialog extends SystemUIDialog implements LifecycleOwner 
             .authority(SETTINGS_SLICE_AUTHORITY)
             .appendPath(SettingsSlicesContract.PATH_SETTING_ACTION)
             .appendPath("ring_volume")
+            .build();
+    private static final Uri VOLUME_SEPARATE_RING_URI = new Uri.Builder()
+            .scheme(ContentResolver.SCHEME_CONTENT)
+            .authority(SETTINGS_SLICE_AUTHORITY)
+            .appendPath(SettingsSlicesContract.PATH_SETTING_ACTION)
+            .appendPath("separate_ring_volume")
+            .build();
+    private static final Uri VOLUME_NOTIFICATION_URI = new Uri.Builder()
+            .scheme(ContentResolver.SCHEME_CONTENT)
+            .authority(SETTINGS_SLICE_AUTHORITY)
+            .appendPath(SettingsSlicesContract.PATH_SETTING_ACTION)
+            .appendPath("notification_volume")
             .build();
     private static final Uri VOLUME_ALARM_URI = new Uri.Builder()
             .scheme(ContentResolver.SCHEME_CONTENT)
